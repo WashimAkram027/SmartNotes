@@ -8,19 +8,22 @@
 
 SmartNotes is a **RAG (Retrieval-Augmented Generation)** document Q&A system. Users upload PDFs or plain text, which are chunked, embedded, and stored in MongoDB Atlas Vector Search. When a user asks a question, the system retrieves relevant chunks via MMR similarity search, then generates an answer using a configurable LLM provider (OpenAI or Anthropic Claude).
 
+**Status:** Locally tested and fully operational. Backend serves API, frontend connects to it, documents are uploaded, embedded, stored, and successfully retrieved for Q&A.
+
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| **Backend** | Python 3.11+, Flask 3.1, Gunicorn |
-| **AI/ML** | LangChain 0.3, LangGraph 0.2, OpenAI GPT-4o-mini, Anthropic Claude 3.5 Sonnet |
-| **Embeddings** | OpenAI `text-embedding-3-small` |
-| **Vector DB** | MongoDB Atlas Vector Search (MMR retrieval) |
-| **Frontend** | React 18, TypeScript 5, Vite, Tailwind CSS |
-| **Deployment** | Railway (backend), Vercel (frontend) |
-| **CI/CD** | GitHub Actions |
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| **Backend** | Python 3.14, Flask, Gunicorn | Flask 3.1.0 |
+| **AI/ML** | LangChain, LangGraph | langchain 1.2.10, langgraph 1.0.9 |
+| **LLM Providers** | OpenAI GPT-4o-mini, Anthropic Claude 3.5 Sonnet | langchain-openai 1.1.10, langchain-anthropic 1.3.3 |
+| **Embeddings** | OpenAI `text-embedding-3-small` (1536 dims) | via langchain-openai |
+| **Vector DB** | MongoDB Atlas Vector Search (MMR retrieval) | langchain-mongodb 0.11.0, pymongo 4.16.0 |
+| **Frontend** | React 18, TypeScript 5, Vite 7.3, Tailwind CSS | |
+| **Deployment** | Railway (backend), Vercel (frontend) | |
+| **CI/CD** | GitHub Actions | |
 
 ---
 
@@ -160,11 +163,32 @@ frontend/src/
 
 ---
 
-## Conventions
+## Important Implementation Notes
 
+### LangChain 1.x Migration
+The project uses LangChain 1.x (not 0.3.x). Key import paths:
+- `MongoDBAtlasVectorSearch` → from `langchain_mongodb` (NOT `langchain_community`)
+- `RecursiveCharacterTextSplitter` → from `langchain_text_splitters` (NOT `langchain.text_splitter`)
+- `PyPDFLoader` → from `langchain_community.document_loaders` (still valid)
+
+### Vector Store Auto-Index
+The `MongoDBAtlasVectorSearch` is configured with `auto_create_index=True` and `auto_index_timeout=120`. On first query after a fresh deployment, it will auto-create the Atlas Vector Search index (~1-3 min build time). Subsequent requests are instant.
+
+### Conventions
 - **Type hints everywhere** — all Python functions have full type annotations
 - **Pydantic for validation** — every API input/output is a Pydantic model
 - **Singleton infrastructure** — MongoDB client, embeddings, and LangGraph are initialized once
-- **Lazy imports** — provider SDKs (`langchain_openai`, `langchain_anthropic`) are imported inside `get_llm()` to avoid loading unused libraries
+- **Lazy imports** — provider SDKs imported inside `get_llm()` to avoid loading unused libraries
 - **No secrets in code** — everything via `.env` / environment variables
 - **Source citations** — every `QueryResponse` includes truncated source chunks with file names and page numbers
+
+---
+
+## Deployment
+
+| Service | Platform | Config File |
+|---------|----------|-------------|
+| Backend | Railway | `backend/Procfile`, `backend/railway.json` |
+| Frontend | Vercel | `frontend/vercel.json` |
+| CI/CD | GitHub Actions | `.github/workflows/deploy.yml` |
+| Database | MongoDB Atlas | Cloud-hosted (no local container) |
