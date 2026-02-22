@@ -48,6 +48,9 @@ def get_vector_store() -> MongoDBAtlasVectorSearch:
             collection=_get_mongo_collection(),
             embedding=get_embeddings(),
             index_name=settings.atlas_vector_search_index,
+            auto_create_index=True,
+            auto_index_timeout=120,  # Atlas indexes can take ~1-3 min
+            dimensions=1536,  # text-embedding-3-small output dims
         )
     return _vector_store
 
