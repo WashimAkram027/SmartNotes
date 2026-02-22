@@ -12,14 +12,12 @@ enabling observability, conditional logic, and future extension
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Any, Literal, TypedDict
+from typing import Any, Literal, TypedDict
 
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langgraph.graph import END, StateGraph
-from langgraph.graph.message import add_messages
-
 from app.domain.models import QueryResponse, SourceDocument
 from app.infrastructure.llm_factory import get_llm, get_provider_info
 from app.infrastructure.vector_store import get_retriever

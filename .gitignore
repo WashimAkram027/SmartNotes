@@ -1,11 +1,13 @@
 # .env, key_param.py, and IDE files
 .env
+backend/.env
 key_param.py
 __pycache__/
 *.pyc
 .vscode/
 .idea/
 *.egg-info/
+.venv/
 
 # Frontend build artifacts
 frontend/node_modules/

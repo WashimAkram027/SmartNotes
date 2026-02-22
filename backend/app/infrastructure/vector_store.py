@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from langchain_community.vectorstores import MongoDBAtlasVectorSearch
+from langchain_mongodb import MongoDBAtlasVectorSearch
 from langchain_core.vectorstores import VectorStoreRetriever
 from pymongo import MongoClient
 from pymongo.collection import Collection
