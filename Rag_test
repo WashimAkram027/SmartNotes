@@ -1,0 +1,206 @@
+from pymongo import MongoClient
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.vectorstores import MongoDBAtlasVectorSearch
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.llms import OpenAI
+from langchain.chains import RetrievalQA
+from langchain_openai.chat_models import ChatOpenAI
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
+import os
+import key_param
+import tkinter as tk
+from tkinter import filedialog, messagebox
+from hashlib import md5
+
+# Environment Setup
+os.environ['OPENAI_API_KEY'] = key_param.openai_api_key
+
+# MongoDB Connection
+def setup_mongo_connection():
+    client = MongoClient(key_param.MONGO_URI)
+    try:
+        client.admin.command('ping')
+        print("Pinged your deployment. You successfully connected to MongoDB!")
+    except Exception as e:
+        print(e)
+    db = client['RagProject']
+    return db['Notes']
+
+collection = setup_mongo_connection()
+
+# Vector Store Configuration
+ATLAS_VECTOR_SEARCH_INDEX_NAME = "vector_index"
+embeddings = OpenAIEmbeddings(openai_api_key=key_param.openai_api_key, disallowed_special=())
+vector_search = MongoDBAtlasVectorSearch(
+    collection=collection,
+    embedding=embeddings,
+    index_name=ATLAS_VECTOR_SEARCH_INDEX_NAME
+)
+retriever = vector_search.as_retriever(search_type="similarity", search_kwargs={"k": 5})
+
+# Prompt and Model Setup
+template = """Answer the question below using the provided context as best as you can.\nIf no clear answer is found, reply \"I don't know based on the provided context.\"\n\nContext: {context}\nQuestion: {question}"""
+prompt = PromptTemplate.from_template(template)
+output_parser = StrOutputParser()
+model = ChatOpenAI(openai_api_key=key_param.openai_api_key, model_name='gpt-3.5-turbo', temperature=0)
+
+retrieval_chain = (
+    {"context": retriever | (lambda docs: "\n\n".join(doc.page_content for doc in docs)), "question": RunnablePassthrough()}
+    | prompt
+    | model
+    | output_parser
+)
+
+# Data Import Functions
+def import_individual_pdf(file_path):
+    if not file_path.endswith(".pdf"):
+        print("Error: Only PDF files are supported.")
+        return
+    if is_data_already_uploaded(file_path):
+        print("This PDF has already been uploaded.")
+        return
+    loader = PyPDFLoader(file_path)
+    data = loader.load()
+    print(f"Loaded {len(data)} documents from {file_path}.")
+    process_and_store_data(data, file_path)
+
+def import_pdf_batch(folder_path):
+    if not os.path.isdir(folder_path):
+        print("Error: Invalid folder path.")
+        return
+    for file_name in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, file_name)
+        if file_path.endswith(".pdf"):
+            import_individual_pdf(file_path)
+
+def is_data_already_uploaded(file_path):
+    try:
+        with open(file_path, "rb") as f:
+            file_hash = md5(f.read()).hexdigest()
+        existing_hashes = collection.distinct("metadata.file_hash")
+        return file_hash in existing_hashes
+    except Exception as e:
+        print("Upload check failed:", e)
+        return False
+
+def process_and_store_data(data, file_path=None):
+    if isinstance(data[0], dict):
+        data = [Document(page_content=doc["page_content"], metadata=doc.get("metadata", {})) for doc in data]
+
+    total_words = sum(len(doc.page_content.split()) for doc in data)
+    if total_words < 1000:
+        chunks = data
+    else:
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1200, chunk_overlap=300)
+        chunks = text_splitter.split_documents(data)
+
+    if file_path:
+        with open(file_path, "rb") as f:
+            file_hash = md5(f.read()).hexdigest()
+    else:
+        file_hash = None
+
+    for chunk in chunks:
+        if file_hash: 
+            chunk.metadata["file_hash"] = file_hash
+
+    MongoDBAtlasVectorSearch.from_documents(
+        documents=chunks,
+        embedding=embeddings,
+        collection=collection,
+        index_name=ATLAS_VECTOR_SEARCH_INDEX_NAME
+    )
+    print("Data processed and stored successfully.")
+
+# GUI Functions
+def import_individual_pdf_gui():
+    file_path = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
+    if file_path:
+        import_individual_pdf(file_path)
+        messagebox.showinfo("Success", "PDF imported successfully!")
+
+def import_pdf_batch_gui():
+    folder_path = filedialog.askdirectory()
+    if folder_path:
+        import_pdf_batch(folder_path)
+        messagebox.showinfo("Success", "Batch of PDFs imported successfully!")
+
+def import_plain_text_gui():
+    text_input_window = tk.Toplevel()
+    text_input_window.title("Enter Plain Text")
+    text_input_window.geometry("400x300")
+
+    text_label = tk.Label(text_input_window, text="Enter your text below:")
+    text_label.pack(pady=10)
+
+    text_box = tk.Text(text_input_window, wrap=tk.WORD, height=10)
+    text_box.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+
+    def submit_text():
+        content = text_box.get("1.0", tk.END).strip()
+        if content:
+            data = [{"page_content": content, "metadata": {"source": "user_input"}}]
+            process_and_store_data(data)
+            messagebox.showinfo("Success", "Plain text imported successfully!")
+            text_input_window.destroy()
+        else:
+            messagebox.showerror("Error", "No text provided.")
+
+    submit_button = tk.Button(text_input_window, text="Submit", command=submit_text)
+    submit_button.pack(pady=10)
+
+def ask_question_gui():
+    question_window = tk.Toplevel()
+    question_window.title("Ask a Question")
+    question_window.geometry("400x200")
+
+    question_label = tk.Label(question_window, text="Enter your question below:")
+    question_label.pack(pady=10)
+
+    question_entry = tk.Entry(question_window, width=50)
+    question_entry.pack(pady=10)
+
+    def submit_question():
+        question = question_entry.get().strip()
+        if question:
+            response = retrieval_chain.invoke(question)
+            messagebox.showinfo("Response", f"Response: {response}")
+            question_window.destroy()
+        else:
+            messagebox.showerror("Error", "No question provided.")
+
+    submit_button = tk.Button(question_window, text="Submit", command=submit_question)
+    submit_button.pack(pady=10)
+
+# Main GUI
+def main_gui():
+    root = tk.Tk()
+    root.title("Note Taking App")
+    root.geometry("400x300")
+
+    title_label = tk.Label(root, text="Note Taking App", font=("Arial", 16))
+    title_label.pack(pady=20)
+
+    import_pdf_button = tk.Button(root, text="Import Individual PDF", command=import_individual_pdf_gui, width=30)
+    import_pdf_button.pack(pady=5)
+
+    import_batch_button = tk.Button(root, text="Import Batch of PDFs", command=import_pdf_batch_gui, width=30)
+    import_batch_button.pack(pady=5)
+
+    import_text_button = tk.Button(root, text="Import Plain Text", command=import_plain_text_gui, width=30)
+    import_text_button.pack(pady=5)
+
+    ask_question_button = tk.Button(root, text="Ask a Question", command=ask_question_gui, width=30)
+    ask_question_button.pack(pady=5)
+
+    exit_button = tk.Button(root, text="Exit", command=root.quit, width=30)
+    exit_button.pack(pady=20)
+
+    root.mainloop()
+
+if __name__ == "__main__":
+    main_gui()
