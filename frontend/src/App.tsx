@@ -24,6 +24,17 @@ export default function App() {
       <aside className="w-[320px] h-full backdrop-blur-[10px] bg-[rgba(255,255,255,0.03)] flex flex-col justify-between p-[25px] shrink-0 relative z-20 border-r border-[rgba(255,255,255,0.08)]">
         {/* Top Section: Header & Controls */}
         <div className="flex flex-col gap-8 items-start w-full overflow-y-auto">
+          {/* API Limitation Notice */}
+          <div className="w-full px-3 py-2.5 rounded-lg bg-[rgba(251,191,36,0.08)] border border-[rgba(251,191,36,0.2)] text-[11px] text-[#fbbf24] leading-[16px]">
+            <div className="flex items-center gap-1.5 font-semibold mb-1">
+              <span className="material-icons-round text-[14px]">info</span>
+              School Project Demo
+            </div>
+            <span className="text-[#d4a017]">
+              Limited API budget — max 5 questions &amp; 3 uploads per hour. Files must be under 5 MB.
+            </span>
+          </div>
+
           {/* App Header */}
           <div className="flex items-center gap-4">
             <div className="w-[48px] h-[48px] shrink-0 flex items-start">

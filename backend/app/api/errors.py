@@ -37,6 +37,10 @@ def register_error_handlers(app: Flask) -> None:
         logger.error("Runtime error: %s", error)
         return jsonify({"error": str(error)}), 503
 
+    @app.errorhandler(429)
+    def too_many_requests(error: HTTPException):
+        return jsonify({"error": "Too many requests. Please try again later."}), 429
+
     @app.errorhandler(ValueError)
     def value_error(error: ValueError):
         return jsonify({"error": str(error)}), 400

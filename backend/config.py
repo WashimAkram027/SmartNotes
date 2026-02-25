@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     chunk_size: int = 1200
     chunk_overlap: int = 300
 
+    # ── Rate Limiting ─────────────────────────────────────────────────
+    rate_limit_queries: int = 5       # max queries per window per IP
+    rate_limit_uploads: int = 3       # max uploads per window per IP
+    rate_limit_window: int = 3600     # sliding window in seconds (1 hour)
+    max_upload_size_mb: int = 5       # max PDF upload size in MB
+
     # ── Server ────────────────────────────────────────────────────────
     flask_debug: bool = False
     cors_origins: str = "*"

@@ -17,10 +17,19 @@ from werkzeug.utils import secure_filename
 from app.application.document_service import ingest_pdf, ingest_plain_text
 from app.application.rag_graph import query_rag
 from app.domain.models import QueryRequest
+from app.api.rate_limiter import check_rate_limit, get_remaining
+from config import settings
 
 logger = logging.getLogger(__name__)
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+
+MAX_UPLOAD_BYTES = settings.max_upload_size_mb * 1024 * 1024
+
+
+def _client_ip() -> str:
+    """Get the real client IP, respecting reverse-proxy headers."""
+    return request.headers.get("X-Forwarded-For", request.remote_addr or "unknown").split(",")[0].strip()
 
 
 # ── Health Check ─────────────────────────────────────────────────────
@@ -32,6 +41,22 @@ def health_check():
     return jsonify({"status": "healthy"}), 200
 
 
+# ── Rate Limit Status ────────────────────────────────────────────────
+
+
+@api_bp.route("/limits", methods=["GET"])
+def rate_limit_status():
+    """Return remaining rate limits for the current client IP."""
+    ip = _client_ip()
+    return jsonify({
+        "queries_remaining": get_remaining("query", ip),
+        "uploads_remaining": get_remaining("upload", ip),
+        "max_queries_per_hour": settings.rate_limit_queries,
+        "max_uploads_per_hour": settings.rate_limit_uploads,
+        "max_upload_size_mb": settings.max_upload_size_mb,
+    }), 200
+
+
 # ── Query Endpoint ───────────────────────────────────────────────────
 
 
@@ -41,6 +66,12 @@ def query():
     POST /api/query
     Body: { "question": "...", "provider": "openai" | "anthropic" }
     """
+    # Rate limit check
+    ip = _client_ip()
+    allowed, msg = check_rate_limit("query", ip)
+    if not allowed:
+        return jsonify({"error": msg}), 429
+
     data = request.get_json(silent=True) or {}
 
     try:
@@ -62,6 +93,12 @@ def upload_document():
     POST /api/documents/upload
     Multipart form-data with a "file" field (PDF).
     """
+    # Rate limit check
+    ip = _client_ip()
+    allowed, msg = check_rate_limit("upload", ip)
+    if not allowed:
+        return jsonify({"error": msg}), 429
+
     if "file" not in request.files:
         return jsonify({"error": "No file provided. Use form field 'file'."}), 400
 
@@ -72,6 +109,16 @@ def upload_document():
     filename = secure_filename(file.filename)
     if not filename.lower().endswith(".pdf"):
         return jsonify({"error": "Only PDF files are supported."}), 400
+
+    # File size check
+    file.seek(0, os.SEEK_END)
+    size = file.tell()
+    file.seek(0)
+    if size > MAX_UPLOAD_BYTES:
+        return jsonify({
+            "error": f"File too large ({size / (1024*1024):.1f} MB). "
+                     f"Maximum allowed size is {settings.max_upload_size_mb} MB."
+        }), 413
 
     # Save to temp dir, process, then clean up
     tmp_dir = tempfile.mkdtemp()
@@ -98,6 +145,12 @@ def upload_text():
     POST /api/documents/text
     Body: { "text": "...", "source": "user_input" }
     """
+    # Rate limit check (counts toward upload limit)
+    ip = _client_ip()
+    allowed, msg = check_rate_limit("upload", ip)
+    if not allowed:
+        return jsonify({"error": msg}), 429
+
     data = request.get_json(silent=True) or {}
     text = data.get("text", "").strip()
 
