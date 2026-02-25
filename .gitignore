@@ -16,3 +16,8 @@ frontend/dist/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Markdown files (except README and future_improvement)
+*.md
+!README.md
+!future_improvement.md

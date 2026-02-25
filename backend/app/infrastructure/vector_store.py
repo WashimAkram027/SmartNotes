@@ -8,6 +8,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import certifi
+
 from langchain_mongodb import MongoDBAtlasVectorSearch
 from langchain_core.vectorstores import VectorStoreRetriever
 from pymongo import MongoClient
@@ -31,7 +33,7 @@ def _get_mongo_collection() -> Collection:
     if _collection is None:
         if not settings.mongo_uri:
             raise RuntimeError("MONGO_URI is not set in the environment.")
-        _client = MongoClient(settings.mongo_uri)
+        _client = MongoClient(settings.mongo_uri, tlsCAFile=certifi.where())
         # Verify connectivity
         _client.admin.command("ping")
         logger.info("Connected to MongoDB Atlas successfully.")
