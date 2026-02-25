@@ -2,11 +2,11 @@
 
 A production-grade **RAG (Retrieval-Augmented Generation)** system that lets you upload documents and ask natural-language questions about their content. Built with modern AI engineering patterns to demonstrate multi-provider LLM abstraction, agentic workflows, and clean architecture.
 
-![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)
+![Python](https://img.shields.io/badge/Python-3.14+-blue?logo=python)
 ![Flask](https://img.shields.io/badge/Flask-3.1-green?logo=flask)
 ![React](https://img.shields.io/badge/React-18-blue?logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
-![LangGraph](https://img.shields.io/badge/LangGraph-0.2-orange)
+![LangGraph](https://img.shields.io/badge/LangGraph-1.0-orange)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-green?logo=mongodb)
 
 ---
@@ -70,7 +70,7 @@ The backend follows a 3-layer pattern:
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Python 3.11+
+- Python 3.14+
 - Node.js 20+
 - MongoDB Atlas cluster with a **Vector Search index** named `vector_index`
 - API keys: OpenAI (required), Anthropic (optional)
@@ -78,16 +78,16 @@ The backend follows a 3-layer pattern:
 ### 1. Clone
 
 ```bash
-git clone https://github.com/NickEscc/InfoNoteTaking.git
-cd InfoNoteTaking
+git clone https://github.com/WashimAkram027/SmartNotes.git
+cd SmartNotes
 ```
 
 ### 2. Backend Setup
 
 ```bash
 cd backend
-python -m venv venv
-venv\Scripts\activate        # Windows
+python -m venv .venv
+.venv\Scripts\activate       # Windows
 # source venv/bin/activate   # macOS/Linux
 
 pip install -r requirements.txt
@@ -186,6 +186,7 @@ SMARTNOTES/
 │   └── railway.json                # Railway deploy config
 ├── frontend/
 │   ├── src/
+│   │   ├── assets/                 # Logo and SVG paths
 │   │   ├── components/             # ChatView, UploadPanel, ProviderSelector
 │   │   ├── hooks/                  # useQuery, useUpload
 │   │   ├── types/                  # TypeScript interfaces
@@ -193,6 +194,7 @@ SMARTNOTES/
 │   │   └── index.css               # Tailwind + design tokens
 │   ├── vercel.json                 # Vercel deploy config
 │   └── package.json
+├── future_improvement.md           # Limitations & improvement roadmap
 ├── .github/workflows/deploy.yml    # CI/CD pipeline
 └── .gitignore
 ```
